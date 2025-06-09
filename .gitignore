@@ -1,0 +1,17 @@
+# Ignore everything by default
+*
+
+# Allow docker-compose.yaml and README.md in any folder and in root
+!docker-compose.yaml
+!*/docker-compose.yaml
+!README.md
+!*/README.md
+!.gitignore
+
+# Ignore common volume and data folders
+volume/
+volumes/
+data/
+*/volume/
+*/volumes/
+*/data/
