@@ -1,96 +1,127 @@
-# How to Set Up AWS, Redis, and RabbitMQ Services Locally
+# Local Development Services Setup
 
-## Contents
+Este repositorio contiene configuraciones Docker Compose para ejecutar servicios de desarrollo local de forma rápida y sencilla.
 
-- [Localstack](#localstack)
-- [AWS Services](#aws-services)
-- [Secret Manager](#secret-manager)
-- [Simple Queue Service](#simple-queue-service)
+> 💡 **Recomendación**: Se recomienda usar [Podman](https://podman.io/) como alternativa más segura a Docker. Podman es compatible con Docker Compose y no requiere privilegios de administrador. Todos los comandos `docker-compose` funcionan directamente con `podman-compose`.
 
-## Service Setup Guide
+## Servicios Disponibles
 
-### Localstack
+- **LocalStack** - Simulador de servicios AWS (Puerto: 4566)
+- **RabbitMQ** - Message broker con interfaz de gestión (Puertos: 5672, 15672)
+- **Redis** - Base de datos en memoria (Puerto: 6379)
+- **SonarQube** - Análisis de código con PostgreSQL (Puerto: 9000)
 
-1. Install **Localstack** on your machine. [Localstack Installation Guide](https://docs.localstack.cloud/getting-started/installation/)
+## Guía de Implementación
 
-2. Create a `docker-compose.yml` file in a directory that will contain all the configuration related to the creation of the services.
+### 🚀 Despliegue Completo (Recomendado)
 
-3. Open the `docker-compose.yml` file and define the AWS services to be deployed in **Localstack**, as shown below:
+Desde la raíz del proyecto:
 
-   ```yaml
-   services:
-     localstack:
-       container_name: "${LOCALSTACK_DOCKER_NAME:-localstack-main}"
-       image: localstack/localstack
-       ports:
-         - "127.0.0.1:4566:4566" # LocalStack Gateway
-         - "127.0.0.1:4510-4559:4510-4559" # external services port range
-       environment:
-         # LocalStack configuration: https://docs.localstack.cloud/references/configuration/
-         - SERVICES=sqs,secretsmanager
-         - DEBUG=${DEBUG:-0}
-         - AWS_ACCESS_KEY_ID=test # default AWS credentials
-         - AWS_SECRET_ACCESS_KEY=test # default AWS credentials
-         - PERSISTENCE=1 # enable persistence
-       volumes:
-         - "${LOCALSTACK_VOLUME_DIR:-./volume}:/var/lib/localstack" # LocalStack data volume
-         - "/var/run/docker.sock:/var/run/docker.sock" # required for launching Docker containers from within LocalStack
-   ```
+```bash
+# Iniciar todos los servicios
+docker-compose up -d
+```
 
-   **Note:** This configuration is based on the [Localstack Docker Compose Guide](https://docs.localstack.cloud/getting-started/installation/#docker-compose).
+```bash
+# Detener todos los servicios
+docker-compose down
+```
 
-4. Run `docker-compose up` in your terminal to start the containers with the specified services.
+#### Servicios Específicos
 
----
+```bash
+# Solo LocalStack
+docker-compose up -d localstack
 
-## AWS Services
+# Solo RabbitMQ y Redis
+docker-compose up -d rabbitmq redis
 
-**IMPORTANT:** The values used here are for TESTING purposes only. Please validate the correct operation and consumption of AWS services in DEVELOP, STAGING, and PRODUCTION environments.
+# Solo SonarQube (incluye base de datos)
+docker-compose up -d sonarqube sonar-db
+```
 
-### Secret Manager
+### 📁 Despliegue Individual
 
-#### Create a Secret
+```bash
+# LocalStack
+cd localstack && docker-compose up -d
 
-1. Before creating a secret, you need to create a `secret.json` file with the data to be stored. You can create it as follows:
+# LocalStack Pro
+cd localstack-pro && docker-compose up -d
 
-   ```
-   echo {"secret": "xyz","secret2": "xyz"} > secret.json
-   ```
+# RabbitMQ
+cd rabbitmq && docker-compose up -d
 
-2. From the command line, run the following command:
+# Redis
+cd redis && docker-compose up -d
 
-   ```
-   awslocal --endpoint-url=http://localhost:4566 secretsmanager create-secret --name secret_name --description "Secret" --secret-string file://secret.json
-   ```
+# SonarQube
+cd sonar && docker-compose up -d
+```
 
-   **Note:** Run this command in the same directory where the `secret.json` file is located.
+```bash
+# Detener (desde cada carpeta respectiva)
+docker-compose down
+```
 
-3. After creating the secret, you will see output similar to the following:
+## Configuración de Acceso
 
-   ```
-   {
-       "ARN": "arn:aws:secretsmanager:us-east-1:000000000000:secret:secret_name-pyfjVP",
-       "Name": "secret_name",
-       "VersionId": "a50c6752-3343-4eb0-acf3-35c74f00f707"
-   }
-   ```
+| Servicio              | URL/Puerto             | Credenciales      |
+| --------------------- | ---------------------- | ----------------- |
+| LocalStack            | http://localhost:4566  | test/test         |
+| RabbitMQ (Management) | http://localhost:15672 | guest/guest       |
+| RabbitMQ (AMQP)       | `localhost:5672`       | guest/guest       |
+| Redis                 | `localhost:6379`       | Sin autenticación |
+| SonarQube             | http://localhost:9000  | admin/admin       |
 
-### Simple Queue Service
+## Configuración Avanzada
 
-#### Create a Queue
+Puedes personalizar la configuración usando variables de entorno:
 
-1. From the command line, run the following command:
+```bash
+# Archivo .env (opcional)
+DEBUG=1
+SONAR_IMAGE=sonarqube:developer
+LOCALSTACK_VOLUME_DIR=./custom-volume
+```
 
-   ```
-   awslocal sqs create-queue --queue-name sqs_name
-   ```
+## Consideraciones Técnicas
 
-2. After creating the SQS queue, you will see output similar to the following:
+- **Podman vs Docker**: Los comandos mostrados usan `docker-compose`, pero son totalmente compatibles con `podman-compose`
+- **Carpeta volume**: Es necesario crear manualmente la carpeta `volume` en el directorio `localstack` antes de ejecutar el servicio
+- **Persistencia**: Los datos se mantienen en volúmenes Docker/Podman nombrados
+- **Networking**: Todos los servicios están en la red `local-services`
+- **Credenciales**: Las credenciales por defecto son para **DESARROLLO** únicamente
+- **Puertos**: Asegúrate de que los puertos no estén ocupados por otros servicios
 
-   ```
-   {
-       "QueueUrl": "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/sqs_name"
-   }
-   ```
+## Referencias Técnicas
 
----
+Para configurar y usar los servicios AWS localmente con LocalStack, consulta la documentación oficial:
+
+### Podman (Recomendado)
+
+- **Documentación oficial**: https://podman.io/
+- **Guía de instalación**: https://podman.io/getting-started/installation
+- **Podman Compose**: https://docs.podman.io/en/latest/markdown/podman-compose.1.html
+- **Migración desde Docker**: https://podman.io/whatis.html
+
+### AWS CLI
+
+- **Documentación oficial**: https://aws.amazon.com/es/cli/
+- **Guía de instalación**: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
+- **Configuración**: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-quickstart.html
+
+### LocalStack
+
+- **Documentación oficial**: https://docs.localstack.cloud/aws/
+- **Configuración de servicios**: https://docs.localstack.cloud/references/configuration/
+- **Integración con AWS CLI**: https://docs.localstack.cloud/integrations/aws-cli/
+
+### RabbitMQ
+
+- **Documentación oficial**: https://www.rabbitmq.com/documentation.html
+- **Tutoriales paso a paso**: https://www.rabbitmq.com/tutorials
+- **Guía de administración**: https://www.rabbitmq.com/admin-guide.html
+- **Management Plugin**: https://www.rabbitmq.com/management.html
+
+
