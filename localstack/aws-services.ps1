@@ -39,6 +39,7 @@ Write-Host ""
 
 $successCount = 0
 $errorCount = 0
+$skippedCount = 0
 
 foreach ($file in $jsonFiles) {
     $secretName = $file.BaseName  # Nombre del archivo sin extensión
@@ -46,18 +47,38 @@ foreach ($file in $jsonFiles) {
     
     Write-Host "📄 Procesando: $($file.Name)" -ForegroundColor White
     
+    # Validar que el nombre del archivo no contenga espacios
+    if ($secretName -match '\s') {
+        Write-Host "   ❌ Error: El nombre del archivo no puede contener espacios en blanco" -ForegroundColor Red
+        Write-Host "   💡 Renombra '$($file.Name)' a '$(($file.Name) -replace '\s', '-')'" -ForegroundColor Yellow
+        $skippedCount++
+        Write-Host ""
+        continue
+    }
+    
     try {
-        # Crear el secreto
-        aws --endpoint-url $endpoint secretsmanager create-secret `
+        # Capturar tanto stdout como stderr
+        $result = aws --endpoint-url $endpoint secretsmanager create-secret `
             --name $secretName `
             --description "Secret from $($file.Name)" `
-            --secret-string file://$filePath 2>$null
+            --secret-string file://$filePath 2>&1
         
         if ($LASTEXITCODE -eq 0) {
             Write-Host "   ✅ Secreto '$secretName' creado exitosamente" -ForegroundColor Green
             $successCount++
         } else {
-            Write-Host "   ❌ Error al crear secreto '$secretName'" -ForegroundColor Red
+            # Mostrar el error específico
+            $errorMessage = $result | Out-String
+            if ($errorMessage -match "already exists") {
+                Write-Host "   ⚠️  El secreto '$secretName' ya existe" -ForegroundColor Yellow
+                Write-Host "   💡 Para actualizarlo usa: aws --endpoint-url $endpoint secretsmanager update-secret --secret-id $secretName --secret-string file://$filePath" -ForegroundColor Gray
+            } elseif ($errorMessage -match "InvalidParameterException") {
+                Write-Host "   ❌ Error: Parámetros inválidos en '$secretName'" -ForegroundColor Red
+                Write-Host "   📋 Detalle: $($errorMessage.Trim())" -ForegroundColor Gray
+            } else {
+                Write-Host "   ❌ Error al crear secreto '$secretName'" -ForegroundColor Red
+                Write-Host "   📋 Detalle: $($errorMessage.Trim())" -ForegroundColor Gray
+            }
             $errorCount++
         }
     }
@@ -70,13 +91,19 @@ foreach ($file in $jsonFiles) {
 }
 
 # Mostrar resumen final
-if ($errorCount -eq 0) {
+Write-Host "📊 Resumen de procesamiento:" -ForegroundColor Cyan
+if ($errorCount -eq 0 -and $skippedCount -eq 0) {
     Write-Host "🎉 Proceso completado exitosamente!" -ForegroundColor Green
-    Write-Host "✅ $successCount secreto(s) creado(s)" -ForegroundColor Green
 } else {
-    Write-Host "⚠️  Proceso completado con errores" -ForegroundColor Yellow
-    Write-Host "✅ $successCount secreto(s) creado(s)" -ForegroundColor Green
+    Write-Host "⚠️  Proceso completado con advertencias/errores" -ForegroundColor Yellow
+}
+
+Write-Host "✅ $successCount secreto(s) creado(s)" -ForegroundColor Green
+if ($errorCount -gt 0) {
     Write-Host "❌ $errorCount error(es)" -ForegroundColor Red
+}
+if ($skippedCount -gt 0) {
+    Write-Host "⏭️  $skippedCount archivo(s) omitido(s) por nombres inválidos" -ForegroundColor Yellow
 }
 
 Write-Host ""
