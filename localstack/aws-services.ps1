@@ -1,0 +1,2 @@
+# Crear secreto de RabbitMQ en LocalStack
+aws --endpoint-url http://localhost:4566 secretsmanager create-secret --name rabbitmq-connection --description "RabbitMQ connection configuration" --secret-string file://$PSScriptRoot/secrets/rabbit-connection.json
