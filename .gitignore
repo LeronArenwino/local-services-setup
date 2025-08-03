@@ -8,6 +8,16 @@
 !*/README.md
 !.gitignore
 
+# Allow PowerShell scripts
+!*.ps1
+!*/*.ps1
+
+# Allow secrets folder and JSON files
+!secrets/
+!secrets/*.json
+!*/secrets/
+!*/secrets/*.json
+
 # Ignore common volume and data folders
 volume/
 volumes/
