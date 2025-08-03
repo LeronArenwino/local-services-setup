@@ -8,19 +8,22 @@ if (-not (Test-Path $secretsPath)) {
     exit 1
 }
 
-# Verificar conexión a LocalStack usando IPv4 específicamente
+# Verificar conexión a LocalStack
 Write-Host "🔍 Verificando conexión a LocalStack..." -ForegroundColor Cyan
 try {
-    $testConnection = Test-NetConnection -ComputerName "127.0.0.1" -Port 4566 -InformationLevel Quiet
-    if ($testConnection) {
+    $tcpClient = New-Object System.Net.Sockets.TcpClient
+    $tcpClient.ConnectAsync("127.0.0.1", 4566).Wait(3000)
+    if ($tcpClient.Connected) {
         Write-Host "✅ LocalStack está ejecutándose en puerto 4566" -ForegroundColor Green
+        $tcpClient.Close()
     } else {
         Write-Host "❌ No se puede conectar al puerto 4566" -ForegroundColor Red
         Write-Host "⚠️  Ejecuta: docker-compose up -d localstack" -ForegroundColor Yellow
         exit 1
     }
 } catch {
-    Write-Host "❌ Error al verificar conexión: $_" -ForegroundColor Red
+    Write-Host "❌ No se puede conectar al puerto 4566" -ForegroundColor Red
+    Write-Host "⚠️  Ejecuta: docker-compose up -d localstack" -ForegroundColor Yellow
     exit 1
 }
 
